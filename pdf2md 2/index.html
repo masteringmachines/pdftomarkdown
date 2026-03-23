@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>pdf2md — PDF to Markdown</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#0a0a0a;--paper:#f5f2ec;--warm:#ede8df;
+  --accent:#c8502a;--accent2:#2a5ec8;--muted:#8a8375;--border:#d4cfc6;
+  --mono:'Geist Mono',monospace;--serif:'Instrument Serif',Georgia,serif;
+}
+html{scroll-behavior:smooth}
+body{background:var(--paper);color:var(--ink);font-family:var(--mono);font-size:13px;line-height:1.6;min-height:100vh;overflow-x:hidden;cursor:none}
+#cur{position:fixed;width:8px;height:8px;background:var(--accent);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);transition:width .2s,height .2s;mix-blend-mode:multiply}
+#cur-ring{position:fixed;width:36px;height:36px;border:1px solid var(--accent);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);opacity:.45}
+body:has(button:hover) #cur,body:has(label:hover) #cur,body:has(.drop-zone:hover) #cur{width:14px;height:14px}
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");background-size:180px;pointer-events:none;z-index:900;opacity:.6}
+header{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:18px 48px;border-bottom:1px solid var(--border);background:rgba(245,242,236,.88);backdrop-filter:blur(14px)}
+.logo-mark{font-family:var(--serif);font-style:italic;font-size:21px;letter-spacing:-.5px}
+.logo-tag{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-left:7px}
+nav{display:flex;gap:28px;align-items:center}
+nav a{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:color .2s}
+nav a:hover{color:var(--ink)}
+.nav-cta{background:var(--ink)!important;color:var(--paper)!important;padding:7px 15px;transition:background .2s!important}
+.nav-cta:hover{background:var(--accent)!important}
+.hero{min-height:100vh;display:flex;flex-direction:column;justify-content:flex-end;padding:120px 48px 80px;position:relative;overflow:hidden}
+.hero-ghost{position:absolute;top:50%;left:-2%;transform:translateY(-50%);font-family:var(--serif);font-style:italic;font-size:clamp(110px,17vw,260px);color:transparent;-webkit-text-stroke:1px var(--border);white-space:nowrap;pointer-events:none;user-select:none;animation:drift 22s ease-in-out infinite alternate;letter-spacing:-4px}
+@keyframes drift{from{transform:translateY(-50%) translateX(0)}to{transform:translateY(-50%) translateX(-3%)}}
+.eyebrow{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--accent);margin-bottom:18px;opacity:0;animation:fadeUp .8s .2s forwards}
+.hero-title{font-family:var(--serif);font-size:clamp(50px,8vw,110px);font-weight:400;line-height:.95;letter-spacing:-2px;margin-bottom:28px;opacity:0;animation:fadeUp .8s .4s forwards}
+.hero-title em{font-style:italic;color:var(--accent)}
+.hero-sub{max-width:440px;color:var(--muted);font-size:12px;line-height:1.75;margin-bottom:44px;opacity:0;animation:fadeUp .8s .6s forwards}
+.hero-btns{display:flex;gap:14px;opacity:0;animation:fadeUp .8s .8s forwards}
+.scroll-hint{position:absolute;right:48px;bottom:80px;display:flex;flex-direction:column;align-items:center;gap:8px;opacity:0;animation:fadeUp .8s 1.2s forwards}
+.scroll-line{width:1px;height:56px;background:linear-gradient(to bottom,var(--border),transparent);animation:scl 2s ease-in-out infinite}
+@keyframes scl{0%,100%{transform:scaleY(1);opacity:1}50%{transform:scaleY(.3);opacity:.3}}
+.scroll-txt{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);writing-mode:vertical-rl}
+@keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+.btn-p{background:var(--ink);color:var(--paper);border:none;font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;padding:13px 26px;cursor:none;position:relative;overflow:hidden}
+.btn-p::after{content:'';position:absolute;inset:0;background:var(--accent);transform:translateX(-101%);transition:transform .3s cubic-bezier(.25,.46,.45,.94)}
+.btn-p:hover::after{transform:translateX(0)}
+.btn-p span{position:relative;z-index:1}
+.btn-g{background:transparent;color:var(--muted);border:1px solid var(--border);font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;padding:13px 26px;cursor:none;transition:color .2s,border-color .2s;text-decoration:none;display:inline-flex;align-items:center}
+.btn-g:hover{color:var(--ink);border-color:var(--ink)}
+.marquee{border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--ink);padding:11px 0;overflow:hidden;white-space:nowrap}
+.mq-inner{display:inline-flex;animation:mq 22s linear infinite}
+@keyframes mq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.mq-item{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:rgba(245,242,236,.6);padding:0 28px}
+.mq-dot{color:var(--accent);padding:0 6px}
+#converter{padding:110px 48px;display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:start}
+.sec-label{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
+.sec-title{font-family:var(--serif);font-size:clamp(30px,4vw,50px);font-weight:400;line-height:1.08;letter-spacing:-1px;margin-bottom:20px}
+.sec-title em{font-style:italic;color:var(--accent)}
+.sec-body{color:var(--muted);line-height:1.8;margin-bottom:32px;font-size:12px}
+.drop-zone{border:1px solid var(--border);background:var(--warm);padding:52px 36px;text-align:center;cursor:none;transition:border-color .2s,background .2s,transform .2s;position:relative;overflow:hidden}
+.drop-zone::before{content:'';position:absolute;inset:8px;border:1px dashed var(--border);pointer-events:none;transition:border-color .2s}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--ink);background:var(--paper);transform:translateY(-2px)}
+.drop-zone:hover::before,.drop-zone.drag-over::before{border-color:var(--accent)}
+.drop-zone.drag-over{background:rgba(200,80,42,.04)}
+.drop-icon{font-size:44px;display:block;margin-bottom:18px;transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
+.drop-zone:hover .drop-icon{transform:translateY(-6px) scale(1.1)}
+.drop-title{font-family:var(--serif);font-size:21px;font-style:italic;margin-bottom:7px}
+.drop-sub{font-size:10px;letter-spacing:1px;color:var(--muted);margin-bottom:24px;text-transform:uppercase}
+#file-input{display:none}
+.opts-row{display:flex;gap:18px;margin-top:18px;flex-wrap:wrap}
+.opt-toggle{display:flex;align-items:center;gap:8px;cursor:none;user-select:none}
+.toggle{width:30px;height:17px;background:var(--border);border-radius:9px;position:relative;transition:background .2s;cursor:none;flex-shrink:0}
+.toggle::after{content:'';position:absolute;left:3px;top:3px;width:11px;height:11px;background:white;border-radius:50%;transition:transform .2s cubic-bezier(.34,1.56,.64,1)}
+.toggle.on{background:var(--ink)}
+.toggle.on::after{transform:translateX(13px)}
+.opt-label{font-size:10px;letter-spacing:.5px;color:var(--muted)}
+.status-pill{display:inline-flex;align-items:center;gap:7px;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:7px 13px;border:1px solid var(--border);margin-top:14px;opacity:0;transition:opacity .3s}
+.status-pill.vis{opacity:1}
+.s-dot{width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.status-pill.ok .s-dot{background:#4caf7d}
+.status-pill.err .s-dot{background:var(--accent)}
+.status-pill.loading .s-dot{background:var(--accent2);animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.out-panel{position:sticky;top:100px}
+.out-header{display:flex;align-items:center;justify-content:space-between;padding:11px 15px;background:var(--ink);color:var(--paper)}
+.out-label{font-size:9px;letter-spacing:2px;text-transform:uppercase}
+.out-btns{display:flex;gap:7px}
+.out-btn{background:transparent;border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.5);font-family:var(--mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:5px 10px;cursor:none;transition:all .2s}
+.out-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.out-btn:disabled{opacity:.28;cursor:not-allowed}
+.prog-wrap{height:2px;background:#222;overflow:hidden;display:none}
+.prog-wrap.on{display:block}
+.prog-bar{height:100%;background:var(--accent);width:0%;transition:width .35s ease}
+.out-body{background:#111;color:#c8c0b4;font-family:var(--mono);font-size:11.5px;line-height:1.72;padding:22px;min-height:420px;max-height:600px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;border:1px solid #222;border-top:none}
+.out-body::-webkit-scrollbar{width:4px}
+.out-body::-webkit-scrollbar-thumb{background:#333;border-radius:2px}
+.out-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;height:420px;gap:12px;color:#3a3a3a}
+.out-ph-icon{font-size:30px;opacity:.4}
+.out-ph-txt{font-size:9px;letter-spacing:1.5px;text-transform:uppercase}
+.md-fm{color:#7ab87a}.md-h1{color:#e8d5c0;font-weight:500}.md-h2{color:#d4c0aa;font-weight:500}.md-h3{color:#b09880}.md-tbl{color:#7ab8c8}.md-tbl-sep{color:#333}.md-bullet{color:var(--accent)}.md-code{color:#7ab8c8}.md-link{color:#6ba4ff}.md-bold{color:#c8a87a}
+.stats-strip{border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border)}
+.stat-cell{background:var(--paper);padding:30px 36px}
+.stat-num{font-family:var(--serif);font-size:52px;font-style:italic;line-height:1;letter-spacing:-2px;margin-bottom:7px}
+.stat-lbl{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+.how-section{padding:110px 48px;border-top:1px solid var(--border)}
+.steps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);margin-top:60px}
+.step-cell{background:var(--paper);padding:44px 36px;transition:background .2s;overflow:hidden}
+.step-cell:hover{background:var(--warm)}
+.step-num{font-family:var(--serif);font-style:italic;font-size:72px;color:var(--border);line-height:1;margin-bottom:22px;transition:color .3s}
+.step-cell:hover .step-num{color:rgba(200,80,42,.18)}
+.step-title{font-family:var(--serif);font-size:20px;font-style:italic;margin-bottom:11px}
+.step-body{font-size:11px;color:var(--muted);line-height:1.72}
+.cli-section{padding:80px 48px;background:var(--ink);color:var(--paper)}
+.cli-section .sec-label{color:var(--accent)}
+.cli-section .sec-title{color:var(--paper)}
+.cli-section .sec-title em{color:var(--accent)}
+.terminal{background:#0d0d0d;border:1px solid #252525;margin-top:36px;overflow:hidden}
+.term-bar{background:#181818;padding:10px 15px;display:flex;align-items:center;gap:6px}
+.td{width:10px;height:10px;border-radius:50%}
+.term-path{margin-left:12px;font-size:10px;color:#4a4a4a;letter-spacing:.5px}
+.term-body{padding:22px 22px 30px;font-size:11.5px;line-height:2}
+.tc{color:#4a4a4a}.tcmd{color:#c8c0b4}.tco{color:#4caf7d}.tcf{color:var(--accent)}.tcp{color:#6ba4ff}
+footer{border-top:1px solid var(--border);padding:36px 48px;display:flex;align-items:center;justify-content:space-between;background:var(--paper)}
+.f-logo{font-family:var(--serif);font-style:italic;font-size:17px}
+.f-copy{font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-left:12px}
+.f-links{display:flex;gap:22px}
+.f-links a{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:color .2s}
+.f-links a:hover{color:var(--ink)}
+@media(max-width:860px){header{padding:14px 22px}nav{display:none}.hero{padding:100px 22px 60px}#converter{grid-template-columns:1fr;padding:80px 22px;gap:44px}.out-panel{position:static}.stats-strip{grid-template-columns:repeat(2,1fr)}.steps-grid{grid-template-columns:1fr}.how-section,.cli-section{padding:80px 22px}footer{padding:24px 22px;flex-direction:column;gap:14px}}
+</style>
+</head>
+<body>
+
+<div id="cur"></div>
+<div id="cur-ring"></div>
+
+<header>
+  <div style="display:flex;align-items:baseline">
+    <span class="logo-mark">pdf2md</span>
+    <span class="logo-tag">Converter</span>
+  </div>
+  <nav>
+    <a href="#converter">Convert</a>
+    <a href="#how">How it works</a>
+    <a href="#cli">CLI</a>
+    <a class="nav-cta" href="https://github.com" target="_blank">GitHub ↗</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <div class="hero-ghost">Markdown</div>
+  <p class="eyebrow">Open Source · Python · Zero Config</p>
+  <h1 class="hero-title">Turn any PDF<br>into clean <em>Markdown</em></h1>
+  <p class="hero-sub">Drop a PDF. Get structured Markdown — with headings, tables, and YAML frontmatter. Works with digital PDFs and scanned documents.</p>
+  <div class="hero-btns">
+    <button class="btn-p" onclick="document.getElementById('converter').scrollIntoView({behavior:'smooth'})"><span>Convert now →</span></button>
+    <a class="btn-g" href="#cli">View CLI docs</a>
+  </div>
+  <div class="scroll-hint">
+    <div class="scroll-line"></div>
+    <span class="scroll-txt">Scroll</span>
+  </div>
+</section>
+
+<div class="marquee">
+  <div class="mq-inner">
+    <span class="mq-item">Digital PDFs</span><span class="mq-dot">✦</span><span class="mq-item">Scanned Documents</span><span class="mq-dot">✦</span><span class="mq-item">Table Extraction</span><span class="mq-dot">✦</span><span class="mq-item">Heading Detection</span><span class="mq-dot">✦</span><span class="mq-item">YAML Frontmatter</span><span class="mq-dot">✦</span><span class="mq-item">Batch Mode</span><span class="mq-dot">✦</span><span class="mq-item">OCR Fallback</span><span class="mq-dot">✦</span><span class="mq-item">Client-Side Only</span><span class="mq-dot">✦</span><span class="mq-item">Digital PDFs</span><span class="mq-dot">✦</span><span class="mq-item">Scanned Documents</span><span class="mq-dot">✦</span><span class="mq-item">Table Extraction</span><span class="mq-dot">✦</span><span class="mq-item">Heading Detection</span><span class="mq-dot">✦</span><span class="mq-item">YAML Frontmatter</span><span class="mq-dot">✦</span><span class="mq-item">Batch Mode</span><span class="mq-dot">✦</span><span class="mq-item">OCR Fallback</span><span class="mq-dot">✦</span><span class="mq-item">Client-Side Only</span><span class="mq-dot">✦</span>
+  </div>
+</div>
+
+<section id="converter">
+  <div>
+    <p class="sec-label">— Drop zone</p>
+    <h2 class="sec-title">Upload your<br><em>PDF file</em></h2>
+    <p class="sec-body">Drag and drop a PDF below or click to browse. Conversion runs entirely in your browser using PDF.js — your files never leave your machine.</p>
+
+    <div class="drop-zone" id="drop-zone">
+      <input type="file" id="file-input" accept=".pdf,application/pdf">
+      <span class="drop-icon" id="drop-icon">⬚</span>
+      <p class="drop-title" id="drop-title">Drop PDF here</p>
+      <p class="drop-sub" id="drop-sub">or click to browse — PDF files only</p>
+      <button class="btn-p" id="browse-btn"><span>Select File</span></button>
+    </div>
+
+    <div class="opts-row">
+      <label class="opt-toggle"><div class="toggle on" id="tog-tables"></div><span class="opt-label">Extract Tables</span></label>
+      <label class="opt-toggle"><div class="toggle on" id="tog-front"></div><span class="opt-label">YAML Frontmatter</span></label>
+      <label class="opt-toggle"><div class="toggle on" id="tog-hl"></div><span class="opt-label">Syntax Highlight</span></label>
+      <label class="opt-toggle"><div class="toggle on" id="tog-pagesep"></div><span class="opt-label">Page Separators</span></label>
+    </div>
+
+    <div class="status-pill" id="status-pill">
+      <div class="s-dot"></div>
+      <span id="status-txt">Idle</span>
+    </div>
+  </div>
+
+  <div class="out-panel">
+    <div class="out-header">
+      <span class="out-label" id="out-label">Output — Markdown</span>
+      <div class="out-btns">
+        <button class="out-btn" id="btn-copy" disabled onclick="copyMd()">Copy</button>
+        <button class="out-btn" id="btn-dl" disabled onclick="downloadMd()">↓ Save .md</button>
+      </div>
+    </div>
+    <div class="prog-wrap" id="prog-wrap"><div class="prog-bar" id="prog-bar"></div></div>
+    <div class="out-body" id="out-body">
+      <div class="out-placeholder">
+        <span class="out-ph-icon">◫</span>
+        <span class="out-ph-txt">Awaiting PDF input</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="stats-strip">
+  <div class="stat-cell"><div class="stat-num" data-target="100">0</div><div class="stat-lbl">% client-side processing</div></div>
+  <div class="stat-cell"><div class="stat-num" data-target="3">0</div><div class="stat-lbl">output modes supported</div></div>
+  <div class="stat-cell"><div class="stat-num" data-target="1">0</div><div class="stat-lbl">Python file, no framework</div></div>
+  <div class="stat-cell"><div class="stat-num">–</div><div class="stat-lbl">files sent to any server</div></div>
+</div>
+
+<section class="how-section" id="how">
+  <p class="sec-label">— Process</p>
+  <h2 class="sec-title">How it <em>works</em></h2>
+  <div class="steps-grid">
+    <div class="step-cell"><div class="step-num">01</div><h3 class="step-title">Parse & detect</h3><p class="step-body">PDF.js reads every word with its exact font size and (x, y) position. Pages below the character threshold trigger automatic OCR fallback via pytesseract in the Python CLI.</p></div>
+    <div class="step-cell"><div class="step-num">02</div><h3 class="step-title">Structure & classify</h3><p class="step-body">Words are grouped into lines by vertical proximity. Font size thresholds classify headings. Tables are identified by column alignment and separated from the text flow.</p></div>
+    <div class="step-cell"><div class="step-num">03</div><h3 class="step-title">Render Markdown</h3><p class="step-body">Tables become pipe tables. Headings get # prefixes. Metadata becomes YAML frontmatter. Output is clean, lint-passing Markdown — copy it or download as .md.</p></div>
+  </div>
+</section>
+
+<section class="cli-section" id="cli">
+  <p class="sec-label">— Command Line</p>
+  <h2 class="sec-title">Built for the<br><em>terminal too</em></h2>
+  <div class="terminal">
+    <div class="term-bar">
+      <div class="td" style="background:#ff5f56"></div>
+      <div class="td" style="background:#ffbd2e"></div>
+      <div class="td" style="background:#27c93f"></div>
+      <span class="term-path">~/documents</span>
+    </div>
+    <div class="term-body"><span class="tc"># Install</span>
+<span class="tc">$ </span><span class="tcmd">pip install pdfplumber</span>
+
+<span class="tc"># Single file</span>
+<span class="tc">$ </span><span class="tcmd">python pdf2md.py <span class="tcp">report.pdf</span></span>
+<span class="tco">✓ Converted: report.pdf → report.md</span>
+
+<span class="tc"># Force OCR for scanned PDFs</span>
+<span class="tc">$ </span><span class="tcmd">python pdf2md.py <span class="tcp">scanned.pdf</span> <span class="tcf">--ocr</span></span>
+
+<span class="tc"># Batch convert a folder</span>
+<span class="tc">$ </span><span class="tcmd">python pdf2md.py <span class="tcp">./pdfs/</span> <span class="tcf">-o</span> <span class="tcp">./markdown/</span></span>
+<span class="tco">  ✓  annual-report.pdf  →  annual-report.md</span>
+<span class="tco">  ✓  whitepaper.pdf     →  whitepaper.md</span>
+<span class="tco">Done: 2/2 converted → ./markdown/</span></div>
+  </div>
+</section>
+
+<footer>
+  <div style="display:flex;align-items:baseline">
+    <span class="f-logo">pdf2md</span>
+    <span class="f-copy">MIT License · Open Source</span>
+  </div>
+  <div class="f-links">
+    <a href="https://github.com" target="_blank">GitHub</a>
+    <a href="#cli">Docs</a>
+    <a href="#converter">Convert</a>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+// Cursor
+const cur=document.getElementById('cur'),ring=document.getElementById('cur-ring');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.left=mx+'px';cur.style.top=my+'px'});
+(function animRing(){rx+=(mx-rx)*.14;ry+=(my-ry)*.14;ring.style.left=rx+'px';ring.style.top=ry+'px';requestAnimationFrame(animRing)})();
+
+// Toggles
+document.querySelectorAll('.opt-toggle').forEach(l=>l.addEventListener('click',()=>l.querySelector('.toggle').classList.toggle('on')));
+
+// Counter animation
+const cio=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{
+    if(!e.isIntersecting)return;
+    const el=e.target,t=parseInt(el.dataset.target);
+    if(isNaN(t))return;
+    let c=0;const step=Math.max(1,Math.ceil(t/40));
+    const iv=setInterval(()=>{c=Math.min(c+step,t);el.textContent=c;if(c>=t)clearInterval(iv)},28);
+    cio.unobserve(el);
+  });
+},{threshold:0.4});
+document.querySelectorAll('.stat-num[data-target]').forEach(el=>cio.observe(el));
+
+// File wiring
+const dropZone=document.getElementById('drop-zone');
+const fileInput=document.getElementById('file-input');
+document.getElementById('browse-btn').addEventListener('click',e=>{e.stopPropagation();fileInput.click()});
+dropZone.addEventListener('click',()=>fileInput.click());
+fileInput.addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0])});
+dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('drag-over')});
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop',e=>{
+  e.preventDefault();dropZone.classList.remove('drag-over');
+  const f=e.dataTransfer.files[0];
+  if(f&&(f.type==='application/pdf'||f.name.endsWith('.pdf')))handleFile(f);
+  else setStatus('err','Only PDF files are supported');
+});
+
+let mdOutput='',outFilename='output.md';
+
+async function handleFile(file){
+  outFilename=file.name.replace(/\.pdf$/i,'')+'.md';
+  document.getElementById('drop-icon').textContent='📄';
+  document.getElementById('drop-title').textContent=file.name;
+  document.getElementById('drop-sub').textContent=(file.size/1024).toFixed(1)+' KB · PDF';
+  setStatus('loading','Reading PDF…');
+  showProg(true);animProg(0,20,300);
+  try{
+    const buf=await file.arrayBuffer();
+    animProg(20,55,500);
+    setStatus('loading','Extracting text…');
+    const md=await extractPDF(buf,file.name);
+    animProg(55,100,400);
+    await new Promise(r=>setTimeout(r,450));
+    mdOutput=md;
+    renderOutput(md);
+    showProg(false);
+    const lines=md.split('\n').length,words=md.split(/\s+/).filter(Boolean).length;
+    setStatus('ok',`Done · ${lines} lines · ${words} words`);
+    document.getElementById('out-label').textContent='Output — '+outFilename;
+    document.getElementById('btn-copy').disabled=false;
+    document.getElementById('btn-dl').disabled=false;
+    document.getElementById('converter').scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(err){
+    showProg(false);
+    setStatus('err','Failed: '+err.message);
+    document.getElementById('out-body').innerHTML=`<div class="out-placeholder"><span class="out-ph-icon">✗</span><span class="out-ph-txt">${err.message}</span></div>`;
+  }
+}
+
+async function extractPDF(buffer,filename){
+  if(!window.pdfjsLib)throw new Error('PDF.js not loaded — need internet connection');
+  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const pdf=await pdfjsLib.getDocument({data:buffer}).promise;
+  const useFront=document.getElementById('tog-front').classList.contains('on');
+  const useTables=document.getElementById('tog-tables').classList.contains('on');
+  const usePageSep=document.getElementById('tog-pagesep').classList.contains('on');
+  const sections=[];
+
+  if(useFront){
+    const meta=await pdf.getMetadata().catch(()=>({info:{}}));
+    const info=meta?.info||{};
+    const lines=['---',`title: ${(info.Title||filename.replace(/\.pdf$/i,'')).trim()}`];
+    if(info.Author)lines.push(`author: ${info.Author.trim()}`);
+    lines.push(`pages: ${pdf.numPages}`,`source: ${filename}`,'---','');
+    sections.push(lines.join('\n'));
+  }
+
+  for(let p=1;p<=pdf.numPages;p++){
+    const page=await pdf.getPage(p);
+    const vp=page.getViewport({scale:1});
+    const content=await page.getTextContent({normalizeWhitespace:true});
+    if(!content.items.length)continue;
+    const byY={};
+    content.items.forEach(item=>{
+      if(!item.str.trim())return;
+      const y=Math.round((vp.height-item.transform[5])/2)*2;
+      if(!byY[y])byY[y]=[];
+      byY[y].push(item);
+    });
+    const ys=Object.keys(byY).map(Number).sort((a,b)=>a-b);
+    const rawLines=[];let prevY=null;
+    for(const y of ys){
+      const items=byY[y].sort((a,b)=>a.transform[4]-b.transform[4]);
+      const text=items.map(i=>i.str).join(' ').replace(/\s{2,}/g,' ').trim();
+      if(!text)continue;
+      if(prevY!==null&&(y-prevY)>18)rawLines.push('');
+      const avgH=items.reduce((s,i)=>s+i.height,0)/items.length;
+      const wc=text.split(/\s+/).length;
+      if(avgH>=18&&wc<=8)rawLines.push('# '+text);
+      else if(avgH>=14&&wc<=10)rawLines.push('## '+text);
+      else if(avgH>=11&&wc<=12)rawLines.push('### '+text);
+      else rawLines.push(text);
+      prevY=y;
+    }
+    let pageLines=useTables?detectTables(rawLines):rawLines;
+    pageLines=mergeLines(pageLines);
+    const pageText=pageLines.join('\n').replace(/\n{3,}/g,'\n\n').trim();
+    if(pageText)sections.push(pageText);
+    if(usePageSep&&p<pdf.numPages)sections.push('\n---');
+  }
+  return sections.join('\n\n').replace(/\n{4,}/g,'\n\n\n').trim()+'\n';
+}
+
+function detectTables(lines){
+  const result=[];let i=0;
+  while(i<lines.length){
+    const parts=splitCols(lines[i]);
+    if(parts.length>=3){
+      const tableLines=[parts];let j=i+1;
+      while(j<lines.length&&splitCols(lines[j]).length>=2){tableLines.push(splitCols(lines[j]));j++;}
+      if(tableLines.length>=2){
+        const maxCols=Math.max(...tableLines.map(r=>r.length));
+        const rows=tableLines.map(r=>{while(r.length<maxCols)r.push('');return r});
+        result.push('| '+rows[0].join(' | ')+' |');
+        result.push('| '+Array(maxCols).fill('---').join(' | ')+' |');
+        rows.slice(1).forEach(r=>result.push('| '+r.join(' | ')+' |'));
+        i=j;continue;
+      }
+    }
+    result.push(lines[i]);i++;
+  }
+  return result;
+}
+function splitCols(line){return line.split(/\t|\s{2,}/).map(s=>s.trim()).filter(Boolean)}
+
+function mergeLines(lines){
+  const out=[];let buf=[];
+  for(const line of lines){
+    if(line===''||line.startsWith('#')||line.startsWith('|')||line==='---'){
+      if(buf.length){out.push(buf.join(' '));buf=[];}
+      out.push(line);
+    }else{buf.push(line);}
+  }
+  if(buf.length)out.push(buf.join(' '));
+  return out;
+}
+
+function renderOutput(md){
+  const body=document.getElementById('out-body');
+  const hl=document.getElementById('tog-hl').classList.contains('on');
+  if(!hl){body.textContent=md;return;}
+  let inFm=false,fmDone=false,fmCount=0;
+  const html=md.split('\n').map(line=>{
+    const e=line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    if(e==='---'&&!fmDone){fmCount++;if(fmCount===1)inFm=true;else if(fmCount===2){inFm=false;fmDone=true;}return`<span class="md-fm">${e}</span>`;}
+    if(inFm)return`<span class="md-fm">${e}</span>`;
+    if(/^# /.test(e))return`<span class="md-h1">${e}</span>`;
+    if(/^## /.test(e))return`<span class="md-h2">${e}</span>`;
+    if(/^#{3,} /.test(e))return`<span class="md-h3">${e}</span>`;
+    if(/^\|/.test(e)&&/\|$/.test(e.trim())){
+      if(/^[\|\s\-:]+$/.test(e))return`<span class="md-tbl-sep">${e}</span>`;
+      return`<span class="md-tbl">${e}</span>`;
+    }
+    if(/^[-*]\s/.test(e))return`<span class="md-bullet">${e}</span>`;
+    return e.replace(/`([^`]+)`/g,'<span class="md-code">`$1`</span>').replace(/\*\*([^*]+)\*\*/g,'<span class="md-bold">**$1**</span>').replace(/\[([^\]]+)\]\([^)]+\)/g,'<span class="md-link">[$1](...)</span>');
+  }).join('\n');
+  body.innerHTML=html;
+}
+
+function showProg(on){document.getElementById('prog-wrap').classList.toggle('on',on);if(!on)document.getElementById('prog-bar').style.width='0%'}
+function animProg(from,to,dur){
+  const bar=document.getElementById('prog-bar'),t0=performance.now();
+  (function step(now){const t=Math.min((now-t0)/dur,1);bar.style.width=(from+(to-from)*t)+'%';if(t<1)requestAnimationFrame(step)})(t0);
+}
+function setStatus(type,txt){
+  const pill=document.getElementById('status-pill');
+  pill.className='status-pill vis '+type;
+  document.getElementById('status-txt').textContent=txt;
+}
+function copyMd(){
+  if(!mdOutput)return;
+  navigator.clipboard.writeText(mdOutput).then(()=>{
+    const btn=document.getElementById('btn-copy');
+    btn.textContent='Copied ✓';setTimeout(()=>btn.textContent='Copy',2000);
+  });
+}
+function downloadMd(){
+  if(!mdOutput)return;
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([mdOutput],{type:'text/markdown'}));
+  a.download=outFilename;a.click();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+# pdf2md requirements
+# Core (required)
+pdfplumber>=0.10.0
+
+# OCR support (optional — only needed for scanned PDFs)
+# Also requires Tesseract installed on your system:
+# macOS:   brew install tesseract
+# Ubuntu:  sudo apt install tesseract-ocr
+# Windows: https://github.com/tesseract-ocr/tesseract/wiki
+pdf2image>=1.16.0
+pytesseract>=0.3.10
